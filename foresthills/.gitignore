@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+data/raw/
+data/derived/*.npy
+data/derived/*.jpg
+out/stills/
+out/pages/
+out/*.log
+out/yardage_book_sample.pdf
+.DS_Store
+out/flyover.mp4

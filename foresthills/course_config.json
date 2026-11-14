@@ -1,0 +1,17 @@
+{
+  "club": "Forest Hills Country Club",
+  "course": "The Championship Course",
+  "location": "Clarkson Valley, Missouri",
+  "tee": "Blue",
+  "rating": 71.5,
+  "slope": 132,
+  "scorecard_source": "https://www.golfpass.com/courses/8509-the-championship-at-forest-hills-country-club/scorecard-and-layout",
+  "par":      [4, 4, 4, 3, 4, 3, 5, 5, 4,   4, 4, 3, 4, 5, 4, 3, 5, 4],
+  "handicap": [9, 13, 5, 17, 11, 15, 1, 7, 3,   16, 4, 14, 8, 10, 12, 18, 2, 6],
+  "yards":    [381, 312, 371, 164, 322, 202, 561, 490, 384,   323, 407, 177, 402, 464, 350, 150, 507, 389],
+  "other_tees": {
+    "Gold":  [404, 324, 402, 182, 330, 214, 583, 502, 409,   338, 425, 196, 416, 513, 386, 160, 531, 402],
+    "White": [360, 300, 335, 148, 288, 184, 539, 452, 346,   310, 394, 165, 387, 447, 330, 137, 493, 372],
+    "Green": [322, 277, 286, 134, 270, 166, 508, 425, 315,   301, 362, 142, 375, 414, 313, 120, 480, 358]
+  }
+}

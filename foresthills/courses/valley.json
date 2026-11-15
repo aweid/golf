@@ -1,0 +1,16 @@
+{
+  "club": "Forest Hills Country Club",
+  "course": "The Valley Course",
+  "location": "Clarkson Valley, Missouri",
+  "tee": "White",
+  "rating": 29.6,
+  "slope": 101,
+  "osm_holes": "handicap",
+  "scorecard_source": "https://www.golfpass.com/courses/8507-the-valley-at-forest-hills-country-club/scorecard-and-layout",
+  "par":      [4, 3, 3, 3, 3, 3, 4, 3, 4],
+  "handicap": [3, 4, 6, 8, 9, 5, 1, 7, 2],
+  "yards":    [263, 169, 122, 150, 110, 188, 303, 203, 304],
+  "other_tees": {
+    "Red": [222, 129, 109, 133, 97, 150, 252, 146, 281]
+  }
+}

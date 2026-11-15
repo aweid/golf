@@ -1,5 +1,6 @@
 """Shared helpers: paths, raster grid, units."""
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -10,14 +11,17 @@ DER = ROOT / "data/derived"
 OUT = ROOT / "out"
 YD = 0.9144  # metres per yard
 FT = 0.3048
+# which course to build: COURSE=valley python scripts/...  (default: championship)
+COURSE = os.environ.get("COURSE", "championship")
+SUFFIX = "" if COURSE == "championship" else f"_{COURSE}"
 
 
 def config():
-    return json.loads((ROOT / "course_config.json").read_text())
+    return json.loads((ROOT / f"courses/{COURSE}.json").read_text())
 
 
 def course():
-    return json.loads((DER / "course.json").read_text())
+    return json.loads((DER / f"course{SUFFIX}.json").read_text())
 
 
 def extent():

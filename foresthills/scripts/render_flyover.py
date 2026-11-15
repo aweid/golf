@@ -1,12 +1,13 @@
 """Render the hole-by-hole flyover video.
 
-  python scripts/render_flyover.py                    # all 18 holes -> out/flyover.mp4
+  python scripts/render_flyover.py                    # every hole -> out/flyover.mp4
+  COURSE=valley python scripts/render_flyover.py      # the Valley course -> out/flyover_valley.mp4
   python scripts/render_flyover.py --holes 1,7        # just these
   python scripts/render_flyover.py --stills           # a few test frames per hole -> out/stills/
   python scripts/render_flyover.py --size 1280x720 --fps 24
 
 Scene: 1 m lidar terrain (with buildings) draped with NAIP imagery, one low-poly tree per
-lidar-detected crown, flagsticks, blue tee markers, low-res surroundings out to the horizon.
+lidar-detected crown, flagsticks, tee markers, low-res surroundings out to the horizon.
 """
 import argparse
 import subprocess
@@ -18,7 +19,7 @@ import tifffile
 from PIL import Image, ImageDraw, ImageFont
 from scipy import ndimage as ndi
 
-from common import DER, OUT, RAW, YD, Grid, course, dem, extent
+from common import DER, OUT, RAW, SUFFIX, YD, Grid, course, dem, extent
 
 SKY_TOP = (0.36, 0.56, 0.86)
 SKY_BOT = (0.80, 0.88, 0.96)
@@ -316,7 +317,7 @@ def main():
     ap.add_argument("--size", default="1920x1080")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--stills", action="store_true")
-    ap.add_argument("--out", default=str(OUT / "flyover.mp4"))
+    ap.add_argument("--out", default=str(OUT / f"flyover{SUFFIX}.mp4"))
     a = ap.parse_args()
     size = tuple(int(v) for v in a.size.split("x"))
     OUT.mkdir(exist_ok=True)
@@ -327,9 +328,10 @@ def main():
     holes = [h for h in C["holes"] if not a.holes or str(h["n"]) in a.holes.split(",")]
 
     if a.stills:
-        (OUT / "stills").mkdir(exist_ok=True)
+        S = OUT / f"stills{SUFFIX}"
+        S.mkdir(exist_ok=True)
         p, t = overview_path(C, D, a.fps)
-        Image.fromarray(composite(shoot(pl, p[len(p) // 2], t[0], origin), title_card(C, size))).save(OUT / "stills/overview.jpg", quality=90)
+        Image.fromarray(composite(shoot(pl, p[len(p) // 2], t[0], origin), title_card(C, size))).save(S / "overview.jpg", quality=90)
         for h in holes:
             p, t = hole_path(h, D, clear, a.fps)
             card = hole_card(C, h, size)
@@ -337,7 +339,7 @@ def main():
                 i = int(fr * (len(p) - 1))
                 t0 = time.time()
                 f = composite(shoot(pl, p[i], t[i], origin), card)
-                Image.fromarray(f).save(OUT / f"stills/hole{h['n']:02d}_{k}.jpg", quality=90)
+                Image.fromarray(f).save(S / f"hole{h['n']:02d}_{k}.jpg", quality=90)
                 print(h["n"], k, f"{time.time() - t0:.2f}s")
         return
 

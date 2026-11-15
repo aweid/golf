@@ -1,6 +1,7 @@
 """Build the pocket yardage book: out/yardage_book.pdf (4.25 x 7 in pages).
+COURSE=valley builds out/yardage_book_valley.pdf.
 
-Per hole: a hole map (tee at the bottom, distances from the blue tee in black, distances
+Per hole: a hole map (tee at the bottom, distances from the tee in black, distances
 to the centre of the green in red, 5 ft contours, elevation profile) and a green page
 (1 ft contours, fall arrows, depth lines every 5 yards from the front edge).
 
@@ -20,7 +21,7 @@ from matplotlib.patches import Polygon as MPoly
 from scipy import ndimage as ndi
 from shapely.geometry import LineString, Point, Polygon
 
-from common import DER, FT, OUT, YD, Grid, course, dem
+from common import DER, FT, OUT, SUFFIX, YD, Grid, course, dem
 
 PAGE = (4.25, 7.0)
 INK = "#1d2a22"
@@ -298,7 +299,7 @@ def hole_page(pdf, C, h, L, page):
     for s in ("top", "right", "left"):
         pa.spines[s].set_visible(False)
     fig.text(0.06, 0.178, "ELEVATION ALONG THE LINE OF PLAY (yards from tee, feet above sea level)", fontsize=4.8, color="#66736a")
-    fig.text(0.94, 0.19, "black: from blue tee    red: to centre of green", fontsize=4.8, color="#66736a", ha="right")
+    fig.text(0.94, 0.19, f"black: from {C['tee'].lower()} tee    red: to centre of green", fontsize=4.8, color="#66736a", ha="right")
     pdf.savefig(fig)
     return fig
 
@@ -409,7 +410,7 @@ def green_page(pdf, C, h, L, page):
     rows = []
     if h["par"] == 3:
         f, c, b = (np.hypot(*(np.array(h[k]) - tee)) / YD for k in ("green_front", "green_center", "green_back"))
-        rows.append(("From the blue tee", f"front {f:.0f}   ·   centre {c:.0f}   ·   back {b:.0f}"))
+        rows.append((f"From the {C['tee'].lower()} tee", f"front {f:.0f}   ·   centre {c:.0f}   ·   back {b:.0f}"))
         rows.append(("Plays like", f"{h['plays_like']} to the centre ({h['elev_change_ft']:+.0f} ft)"))
     else:
         rows.append(("Front / back of centre", f"front −{np.hypot(*(np.array(h['green_front']) - gc)) / YD:.0f}   ·   back +{np.hypot(*(np.array(h['green_back']) - gc)) / YD:.0f} yards"))
@@ -482,8 +483,12 @@ def scorecard(pdf, C, L):
             row([h["n"], h["par"], h["handicap"], h["yards"], h["plays_like"], f"{h['elev_change_ft']:+.0f}", ""])
         row([name, sum(h["par"] for h in hs), "", sum(h["yards"] for h in hs), sum(h["plays_like"] for h in hs), "", ""], True, True)
 
-    block(H[:9], "OUT")
-    block(H[9:], "IN")
+    if len(H) > 9:
+        block(H[:9], "OUT")
+        block(H[9:], "IN")
+    else:
+        for h in H:
+            row([h["n"], h["par"], h["handicap"], h["yards"], h["plays_like"], f"{h['elev_change_ft']:+.0f}", ""])
     row(["TOT", sum(h["par"] for h in H), "", sum(h["yards"] for h in H), sum(h["plays_like"] for h in H), "", ""], True, True)
 
     # routing map, north up
@@ -503,7 +508,7 @@ def scorecard(pdf, C, L):
                 bbox=dict(boxstyle="circle,pad=0.18", fc=COL["blue"], ec="white", lw=0.4))
     setup(ax, xlim, ylim)
     north_arrow(ax, fr, xlim, ylim)
-    fig.text(0.06, 0.022, "“Plays” adds 1 yard per 3 ft of climb from blue tee to green.", fontsize=5, color="#66736a")
+    fig.text(0.06, 0.022, f"“Plays” adds 1 yard per 3 ft of climb from {C['tee'].lower()} tee to green.", fontsize=5, color="#66736a")
     pdf.savefig(fig)
     return fig
 
@@ -512,14 +517,16 @@ def notes_page(pdf, C):
     fig = plt.figure(figsize=PAGE)
     fig.text(0.06, 0.957, "HOW TO READ THIS BOOK", fontsize=11, weight="bold", color=INK, va="center")
     fig.add_artist(plt.Line2D([0.06, 0.94], [0.936, 0.936], color=INK, lw=0.8))
+    tee = C["tee"].lower()
+    tot, par = sum(h["yards"] for h in C["holes"]), sum(h["par"] for h in C["holes"])
     txt = [
-        ("Black numbers", "Yards from the blue tee. Ticks on the line of play are carry distances; “235–251” beside a bunker or water is the distance to reach it and to carry it."),
+        ("Black numbers", f"Yards from the {tee} tee. Ticks on the line of play are carry distances; “235–251” beside a bunker or water is the distance to reach it and to carry it."),
         ("Red numbers", "Yards to the centre of the green. Red ticks mark 100, 150, 200 and 250 out; a red number beside a hazard is what is left once you are past it."),
-        ("Par 3s", "F, C and B are yards from the blue tee to the front, centre and back of the green along the line of play."),
+        ("Par 3s", f"F, C and B are yards from the {tee} tee to the front, centre and back of the green along the line of play."),
         ("Contours", "Hole maps: every 5 ft, heavier every 25 ft. Green pages: every 1 ft, dotted every 6 in, with arrows showing which way the ground falls."),
         ("Plays like", "Scorecard yards plus 1 yard for every 3 ft the green sits above the tee (minus when it is below). Wind and temperature are yours to add."),
-        ("Where the numbers come from", "Hole layout, greens, tees and bunkers: OpenStreetMap contributors. Elevation: USGS 3DEP 1 m lidar. Trees: USGS lidar (2012) checked against USDA NAIP imagery. Scorecard: the club’s blue tees, 6,356 yards, par 72."),
-        ("Caveats", "Blue tee positions are the mapped tee box that best matches the card; markers move daily. Green contours are from lidar, so a green rebuilt since the survey will differ. Pin positions are not shown."),
+        ("Where the numbers come from", f"Hole layout, greens, tees and bunkers: OpenStreetMap contributors. Elevation: USGS 3DEP 1 m lidar. Trees: USGS lidar (2012) checked against USDA NAIP imagery. Scorecard: the club’s {tee} tees, {tot:,} yards, par {par}."),
+        ("Caveats", f"{C['tee']} tee positions are the mapped tee box that best matches the card; markers move daily. Green contours are from lidar, so a green rebuilt since the survey will differ. Pin positions are not shown."),
     ]
     y = 0.90
     for k, v in txt:
@@ -542,8 +549,8 @@ def main():
          "dem_s": Grid(ndi.gaussian_filter(D.a, 2.0)),
          "dem_g": Grid(ndi.gaussian_filter(D.a, 1.2))}
     OUT.mkdir(exist_ok=True)
-    want = [int(v) for v in a.holes.split(",")] if a.holes else list(range(1, 19))
-    name = OUT / ("yardage_book.pdf" if not a.holes else "yardage_book_sample.pdf")
+    want = [int(v) for v in a.holes.split(",")] if a.holes else [h["n"] for h in C["holes"]]
+    name = OUT / (f"yardage_book{SUFFIX}.pdf" if not a.holes else f"yardage_book{SUFFIX}_sample.pdf")
     figs = []
     greens = {}
     with PdfPages(name) as pdf:
@@ -561,9 +568,9 @@ def main():
         if not a.holes:
             figs.append(notes_page(pdf, C))
     if a.png:
-        (OUT / "pages").mkdir(exist_ok=True)
+        (OUT / f"pages{SUFFIX}").mkdir(exist_ok=True)
         for i, f in enumerate(figs):
-            f.savefig(OUT / f"pages/p{i + 1:02d}.png", dpi=170, facecolor=f.get_facecolor())
+            f.savefig(OUT / f"pages{SUFFIX}/p{i + 1:02d}.png", dpi=170, facecolor=f.get_facecolor())
     print("wrote", name, len(figs), "pages")
     for n, g in greens.items():
         print(f"  green {n}: {g['slope']:.1f}% toward {g['toward']}")

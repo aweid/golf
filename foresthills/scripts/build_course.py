@@ -1,6 +1,7 @@
-"""Turn the OSM features + scorecard + elevation into data/derived/course.json.
+"""Turn the OSM features + scorecard + elevation into data/derived/course.json
+(course_<name>.json for COURSE=<name>).
 
-All coordinates are EPSG:26915 metres. Each hole gets: line of play, blue tee point,
+All coordinates are EPSG:26915 metres. Each hole gets: line of play, tee point,
 green polygon with front/centre/back, the tee boxes, fairways, bunkers and water that
 belong to it, and elevations.
 """
@@ -11,7 +12,7 @@ import pyproj
 from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 
-from common import DER, FT, RAW, YD, config, dem
+from common import DER, FT, RAW, SUFFIX, YD, config, dem
 
 T = pyproj.Transformer.from_crs(4326, 26915, always_xy=True)
 
@@ -45,13 +46,16 @@ def main():
         return [e for e in els if e.get("tags", {}).get(k) in vals]
 
     hole_ways = tagged("golf", "hole")
-    champ = {int(e["tags"]["ref"]): LineString(xy(e)) for e in hole_ways if "handicap" not in e["tags"]}
-    other = [LineString(xy(e)) for e in hole_ways if "handicap" in e["tags"]]
-    assert sorted(champ) == list(range(1, 19)), sorted(champ)
+    # the club has two courses; in OSM only the 9-hole Valley course's holes carry a handicap tag
+    valley = cfg.get("osm_holes") == "handicap"
+    champ = {int(e["tags"]["ref"]): LineString(xy(e)) for e in hole_ways if ("handicap" in e["tags"]) == valley}
+    other = [LineString(xy(e)) for e in hole_ways if ("handicap" in e["tags"]) != valley]
+    N = len(cfg["par"])
+    assert sorted(champ) == list(range(1, N + 1)), sorted(champ)
     all_lines = [(n, l) for n, l in champ.items()] + [(None, l) for l in other]
 
     def owner(geom, maxd, head=None):
-        """Hole whose line of play is nearest to geom (None if it belongs to the 9-hole course)."""
+        """Hole whose line of play is nearest to geom (None if it belongs to the club's other course)."""
         best = (maxd, None, False)
         for n, l in all_lines:
             ll = l if head is None else LineString([l.interpolate(t * head, normalized=True) for t in np.linspace(0, 1, 12)])
@@ -70,8 +74,15 @@ def main():
     paths = [LineString(xy(e)) for e in tagged("golf", "path", "cartpath") if e["type"] == "way" and len(e["geometry"]) >= 2]
     buildings = [p.buffer(0) for e in els if "building" in e.get("tags", {}) for p in polys(e)]
 
+    # a course mapped only as lines of play: greens and bunkers come from detect_features.py
+    det_f = DER / f"detected{SUFFIX}.json"
+    det = json.loads(det_f.read_text()) if det_f.exists() else None
+    if det:
+        greens += [g for g in (Polygon(p) for p in det["greens"].values()) if not any(g.intersects(o) for o in greens)]
+        bunkers += [b for b in (Polygon(p) for p in det["bunkers"]) if not any(b.intersects(o) for o in bunkers)]
+
     holes = []
-    for n in range(1, 19):
+    for n in range(1, N + 1):
         line = champ[n]
         pts = list(line.coords)
         end = Point(pts[-1])
@@ -85,7 +96,16 @@ def main():
 
         # tee boxes on this hole: nearest to the first 45 % of this hole's line
         mine = [t for t in tees if owner(t.centroid, 45, head=0.45) == n]
-        if not mine:
+        if det:
+            # no mapped tee boxes: put a tee pad on the first leg where the hole measures the card yardage
+            p0 = np.array(pts[0])
+            u0 = np.array(pts[1] if len(pts) > 2 else (gc.x, gc.y)) - p0
+            u0 /= np.linalg.norm(u0)
+            c = min((p0 + t * u0 for t in np.arange(-12, 12.01, 0.5)), key=lambda p: abs(play_len(Point(*p)) - yards))
+            v0 = np.array([-u0[1], u0[0]])
+            mine = [Polygon([c + a * u0 + b * v0 for a, b in ((-6, -3.5), (6, -3.5), (6, 3.5), (-6, 3.5))])]
+            tees.append(mine[0])
+        elif not mine:
             mine = [min(tees, key=lambda t: t.distance(Point(pts[0])))]
         box = min(mine, key=lambda t: abs(play_len(t.centroid) - yards))
         c = box.centroid
@@ -160,7 +180,7 @@ def main():
             "plays_like": round(yards + (z_green - z_tee) / YD),
             "profile": {"step_m": 2.0, "z_m": [round(float(v), 2) for v in prof]},
         })
-        print(f"{n:2d} par {par} blue {yards:3d}  measured {measured:5.0f} ({measured - yards:+4.0f})  "
+        print(f"{n:2d} par {par} card {yards:3d}  measured {measured:5.0f} ({measured - yards:+4.0f})  "
               f"tees {len(mine)}  fw {len(h_fair)}  bunkers {len(h_bunkers)}  water {len(h_water)}  "
               f"green {holes[-1]['green_depth_yd']}x{holes[-1]['green_width_yd']}  elev {holes[-1]['elev_change_ft']:+.0f} ft")
 
@@ -179,7 +199,7 @@ def main():
         },
     }
     DER.mkdir(parents=True, exist_ok=True)
-    (DER / "course.json").write_text(json.dumps(out))
+    (DER / f"course{SUFFIX}.json").write_text(json.dumps(out))
     tot = sum(h["measured_yards"] for h in holes)
     print(f"total measured {tot:.0f} vs card {sum(cfg['yards'])}")
 

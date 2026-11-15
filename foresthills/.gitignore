@@ -9,3 +9,7 @@ out/*.log
 out/yardage_book_sample.pdf
 .DS_Store
 out/flyover.mp4
+out/flyover*.mp4
+out/stills*/
+out/pages*/
+out/*_sample.pdf
